@@ -1,4 +1,5 @@
 #include <cairo.h>
+#include <math.h>
 #include <gtk/gtk.h>
 #include <string.h>
 
@@ -19,41 +20,61 @@ typedef struct {
     ToolType current_tool;
     double brush_radius;
     GdkRGBA brush_color;
+
+    double pan_x;
+    double pan_y;
     double zoom;
 
     GtkCssProvider *css_provider;
 } AppState;
 
 
-static
-void composite_layers(AppState *app, cairo_t *cr)
-{
-    for (GList *it = app->layers; it != NULL; it = it->next) {
-        Layer *l = it->data;
-        if (!l->visible || !l->surface) continue;
-        cairo_save(cr);
-        if (l->opacity < 1.0) cairo_paint_with_alpha(cr, 0);
-
-        cairo_set_source_surface(cr, l->surface, 0, 0);
-        cairo_paint_with_alpha(cr, l->opacity);
-        cairo_restore(cr);
-    }
-}
-
-static
-gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data)
+static gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data)
 {
     AppState *app = user_data;
 
     GtkAllocation alloc;
     gtk_widget_get_allocation(widget, &alloc);
+    int vw = alloc.width;
+    int vh = alloc.height;
 
-    cairo_save(cr);
-    cairo_scale(cr, app->zoom, app->zoom);
-    composite_layers(app, cr);
-    cairo_restore(cr);
+    cairo_surface_t *tmp_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, vw, vh);
+    cairo_t *tmp_cr = cairo_create(tmp_surface);
+
+    cairo_set_source_rgb(tmp_cr, 1, 1, 1);
+    cairo_paint(tmp_cr);
+
+    int canvas_x0 = (int)floor(app->pan_x);
+    int canvas_y0 = (int)floor(app->pan_y);
+
+    cairo_scale(tmp_cr, app->zoom, app->zoom);
+
+    for (GList *it = app->layers; it != NULL; it = it->next) {
+        Layer *l = it->data;
+        if (!l->visible || !l->surface) continue;
+
+        cairo_save(tmp_cr);
+
+        cairo_set_source_surface(tmp_cr, l->surface,
+                                 -canvas_x0, -canvas_y0);
+        cairo_pattern_t *pattern = cairo_get_source(tmp_cr);
+        cairo_pattern_set_filter(pattern, CAIRO_FILTER_NEAREST);
+        cairo_paint_with_alpha(tmp_cr, l->opacity);
+
+        cairo_restore(tmp_cr);
+    }
+
+    cairo_set_source_surface(cr, tmp_surface, 0, 0);
+    cairo_pattern_t *pattern = cairo_get_source(cr);
+    cairo_pattern_set_filter(pattern, CAIRO_FILTER_NEAREST);
+    cairo_paint(cr);
+
+    cairo_destroy(tmp_cr);
+    cairo_surface_destroy(tmp_surface);
+
     return FALSE;
 }
+
 
 static
 void destroy_widget_cb(GtkWidget *widget, gpointer user_data)
@@ -65,15 +86,22 @@ gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event, gpointer user_data)
 {
     AppState *app = user_data;
 
-    if (event->direction == GDK_SCROLL_UP)
-        app->zoom *= 1.1;
-    else if (event->direction == GDK_SCROLL_DOWN)
-        app->zoom /= 1.1;
+    if (!(event->state & GDK_CONTROL_MASK))
+        return FALSE;
+
+    double old_zoom = app->zoom;
+    double mx = event->x;
+    double my = event->y;
+
+    if (event->direction == GDK_SCROLL_UP) app->zoom *= 1.1;
+    else if (event->direction == GDK_SCROLL_DOWN) app->zoom /= 1.1;
+
+    app->pan_x += mx / old_zoom - mx / app->zoom;
+    app->pan_y += my / old_zoom - my / app->zoom;
 
     gtk_widget_queue_draw(app->drawing_area);
     return TRUE;
 }
-
 static
 void on_layer_visibility_toggled(GtkToggleButton *toggle, gpointer user_data)
 {
@@ -224,6 +252,8 @@ int main(int argc, char *argv[])
 
     AppState *app = g_new0(AppState, 1);
 
+    app->pan_x = 0.0;
+    app->pan_y = 0.0;
     app->zoom = 1.0;
     app->current_tool = TOOL_BRUSH;
     app->brush_radius = 10.0;
