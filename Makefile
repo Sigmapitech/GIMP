@@ -6,7 +6,7 @@ OUT := epi-gimp
 SRC := $(shell find src -type f -name "*.c")
 OBJS := $(SRC:%.c=$(BUILD)/%.o)
 
-LIBS := gtk4
+LIBS := gtk+-3.0
 $(info $(LIBS))
 
 CFLAGS += $(shell cat warning_flags.txt)

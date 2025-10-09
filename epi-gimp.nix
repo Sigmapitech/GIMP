@@ -2,18 +2,25 @@
   lib,
   stdenv,
   pkg-config,
-  gtk4,
+  gtk3,
+  wrapGAppsHook3
 }:
+
 stdenv.mkDerivation {
-  name = "epi-gimp";
+  pname = "epi-gimp";
+  version = "1.0";
+
   src = ./.;
 
-  hardeningDisable = ["format"];
+  hardeningDisable = [ "format" ];
 
-  nativeBuildInputs = [pkg-config];
+  nativeBuildInputs = [
+    pkg-config
+    wrapGAppsHook3
+  ];
 
   buildInputs = [
-    gtk4
+    gtk3
   ];
 
   env = {
@@ -21,10 +28,10 @@ stdenv.mkDerivation {
     RELEASE = true;
   };
 
-  meta = {
+  meta = with lib; {
     description = "GIMP re-creation project as part of the SPW";
-    maintainers = with lib.maintainers; [sigmanificient];
-    license = lib.licenses.bsd3;
+    maintainers = with maintainers; [ sigmanificient ];
+    license = licenses.bsd3;
     mainProgram = "epi-gimp";
   };
 }

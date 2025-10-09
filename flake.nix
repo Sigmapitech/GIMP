@@ -26,6 +26,7 @@
         hardeningDisable = [ "format" ];
         packages = with pkgs; [
           compiledb
+          valgrind
         ];
       };
     });
