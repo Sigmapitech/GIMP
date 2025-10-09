@@ -19,6 +19,7 @@ typedef struct {
     ToolType current_tool;
     double brush_radius;
     GdkRGBA brush_color;
+    double zoom;
 
     GtkCssProvider *css_provider;
 } AppState;
@@ -48,6 +49,7 @@ gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data)
     gtk_widget_get_allocation(widget, &alloc);
 
     cairo_save(cr);
+    cairo_scale(cr, app->zoom, app->zoom);
     composite_layers(app, cr);
     cairo_restore(cr);
     return FALSE;
@@ -57,6 +59,19 @@ static
 void destroy_widget_cb(GtkWidget *widget, gpointer user_data)
 {
     gtk_widget_destroy(widget);
+}
+
+gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event, gpointer user_data)
+{
+    AppState *app = user_data;
+
+    if (event->direction == GDK_SCROLL_UP)
+        app->zoom *= 1.1;
+    else if (event->direction == GDK_SCROLL_DOWN)
+        app->zoom /= 1.1;
+
+    gtk_widget_queue_draw(app->drawing_area);
+    return TRUE;
 }
 
 static
@@ -194,7 +209,9 @@ void build_ui(AppState *app)
         | GDK_POINTER_MOTION_MASK
         | GDK_SCROLL_MASK
         | GDK_BUTTON_MOTION_MASK);
+
     g_signal_connect(app->drawing_area, "draw", G_CALLBACK(on_draw_event), app);
+    g_signal_connect(app->drawing_area, "scroll-event", G_CALLBACK(on_scroll), app);
 
     GtkWidget *frame = gtk_frame_new(NULL);
     gtk_container_add(GTK_CONTAINER(frame), app->drawing_area);
@@ -206,6 +223,8 @@ int main(int argc, char *argv[])
     gtk_init(&argc, &argv);
 
     AppState *app = g_new0(AppState, 1);
+
+    app->zoom = 1.0;
     app->current_tool = TOOL_BRUSH;
     app->brush_radius = 10.0;
     gdk_rgba_parse(&app->brush_color, "#000000");
