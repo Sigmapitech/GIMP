@@ -1,6 +1,7 @@
 #include <cairo.h>
-#include <math.h>
 #include <gtk/gtk.h>
+#include <math.h>
+#include <stdbool.h>
 #include <string.h>
 
 #include "layer.h"
@@ -23,13 +24,16 @@ typedef struct {
 
     double pan_x;
     double pan_y;
+    double last_mouse_x, last_mouse_y;
     double zoom;
+
+    bool is_drawing;
 
     GtkCssProvider *css_provider;
 } AppState;
 
-
-static gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data)
+static
+gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data)
 {
     AppState *app = user_data;
 
@@ -55,8 +59,7 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data
 
         cairo_save(tmp_cr);
 
-        cairo_set_source_surface(tmp_cr, l->surface,
-                                 -canvas_x0, -canvas_y0);
+        cairo_set_source_surface(tmp_cr, l->surface, -canvas_x0, -canvas_y0);
         cairo_pattern_t *pattern = cairo_get_source(tmp_cr);
         cairo_pattern_set_filter(pattern, CAIRO_FILTER_NEAREST);
         cairo_paint_with_alpha(tmp_cr, l->opacity);
@@ -68,13 +71,23 @@ static gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data
     cairo_pattern_t *pattern = cairo_get_source(cr);
     cairo_pattern_set_filter(pattern, CAIRO_FILTER_NEAREST);
     cairo_paint(cr);
-
     cairo_destroy(tmp_cr);
     cairo_surface_destroy(tmp_surface);
-
     return FALSE;
 }
 
+static
+void on_brush_button(GtkButton *btn, gpointer user_data)
+{
+    AppState *app = user_data;
+    app->current_tool = TOOL_BRUSH;
+}
+
+static void on_brush_radius_changed(GtkRange *range, gpointer user_data)
+{
+    AppState *app = user_data;
+    app->brush_radius = gtk_range_get_value(range);
+}
 
 static
 void destroy_widget_cb(GtkWidget *widget, gpointer user_data)
@@ -102,6 +115,102 @@ gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event, gpointer user_data)
     gtk_widget_queue_draw(app->drawing_area);
     return TRUE;
 }
+
+static
+void paint_on_active_layer(AppState *app, double cx, double cy)
+{
+    if (!app->active_layer || !app->active_layer->surface) return;
+    cairo_t *cr = cairo_create(app->active_layer->surface);
+    cairo_set_source_rgba(cr,
+        app->brush_color.red,
+        app->brush_color.green,
+        app->brush_color.blue,
+        app->brush_color.alpha);
+    cairo_arc(cr, cx, cy, app->brush_radius, 0, 2*M_PI);
+    cairo_fill(cr);
+    cairo_destroy(cr);
+}
+
+static
+void widget_to_canvas(AppState *app, double wx, double wy, double *cx, double *cy)
+{
+    *cx = wx / app->zoom + app->pan_x;
+    *cy = wy / app->zoom + app->pan_y;
+}
+
+static
+void brush_line(AppState *app, double x0, double y0, double x1, double y1)
+{
+    double dx = x1 - x0;
+    double dy = y1 - y0;
+    double dist = sqrt(dx*dx + dy*dy);
+    int steps = MAX(1, (int)(dist / (app->brush_radius * 0.5)));
+
+    for (int i=0;i<=steps;i++) {
+        double t = (double)i/steps;
+        double x = x0 + (x1-x0)*t;
+        double y = y0 + (y1-y0)*t;
+        paint_on_active_layer(app, x, y);
+    }
+}
+
+static
+gboolean on_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+{
+    AppState *app = user_data;
+    gtk_widget_grab_focus(widget);
+
+    if (event->button == GDK_BUTTON_PRIMARY && app->current_tool == TOOL_BRUSH) {
+        app->is_drawing = TRUE;
+        double cx, cy;
+        widget_to_canvas(app, event->x, event->y, &cx, &cy);
+        brush_line(app, cx, cy, cx, cy);
+        gtk_widget_queue_draw(app->drawing_area);
+        app->last_mouse_x = event->x;
+        app->last_mouse_y = event->y;
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static
+gboolean on_button_release(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+{
+    AppState *app = user_data;
+
+    if (event->button == GDK_BUTTON_PRIMARY && app->current_tool == TOOL_BRUSH) {
+        app->is_drawing = FALSE;
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static
+gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpointer user_data)
+{
+    AppState *app = user_data;
+    double x = event->x;
+    double y = event->y;
+
+    if (app->is_drawing && app->current_tool == TOOL_BRUSH) {
+        double cx0, cy0, cx1, cy1;
+        widget_to_canvas(app, app->last_mouse_x, app->last_mouse_y, &cx0, &cy0);
+        widget_to_canvas(app, x, y, &cx1, &cy1);
+        brush_line(app, cx0, cy0, cx1, cy1);
+        app->last_mouse_x = x;
+        app->last_mouse_y = y;
+        gtk_widget_queue_draw(app->drawing_area);
+        return TRUE;
+    }
+
+    app->last_mouse_x = x;
+    app->last_mouse_y = y;
+    gtk_widget_queue_draw(app->drawing_area);
+    return FALSE;
+}
+
 static
 void on_layer_visibility_toggled(GtkToggleButton *toggle, gpointer user_data)
 {
@@ -150,7 +259,7 @@ void refresh_layer_list(AppState *app)
     g_list_free(children);
 }
 
-static
+
 void on_add_layer(GtkButton *btn, gpointer user_data)
 {
     AppState *app = user_data;
@@ -196,8 +305,7 @@ void on_new_blank_layer(GtkButton *btn, gpointer user_data)
     gtk_widget_queue_draw(app->drawing_area);
 }
 
-static
-void build_ui(AppState *app)
+static void build_ui(AppState *app)
 {
     app->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(app->window), "GIMP - Layers Demo");
@@ -209,6 +317,17 @@ void build_ui(AppState *app)
 
     GtkWidget *left_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
     gtk_paned_pack1(GTK_PANED(hpaned), left_vbox, FALSE, FALSE);
+
+    GtkWidget *brush_btn = gtk_button_new_with_label("Brush Tool");
+    g_signal_connect(brush_btn, "clicked", G_CALLBACK(on_brush_button), app);
+    gtk_box_pack_start(GTK_BOX(left_vbox), brush_btn, FALSE, FALSE, 2);
+
+    GtkWidget *radius_label = gtk_label_new("Brush Radius");
+    gtk_box_pack_start(GTK_BOX(left_vbox), radius_label, FALSE, FALSE, 2);
+    GtkWidget *radius_slider = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 1, 50, 1);
+    gtk_range_set_value(GTK_RANGE(radius_slider), app->brush_radius);
+    g_signal_connect(radius_slider, "value-changed", G_CALLBACK(on_brush_radius_changed), app);
+    gtk_box_pack_start(GTK_BOX(left_vbox), radius_slider, FALSE, FALSE, 2);
 
     GtkWidget *add_btn = gtk_button_new_with_label("Add Image Layer");
     g_signal_connect(add_btn, "clicked", G_CALLBACK(on_add_layer), app);
@@ -228,6 +347,8 @@ void build_ui(AppState *app)
     gtk_paned_pack2(GTK_PANED(hpaned), right_vbox, TRUE, FALSE);
 
     app->drawing_area = gtk_drawing_area_new();
+    app->is_drawing = false;
+
     gtk_widget_set_hexpand(app->drawing_area, TRUE);
     gtk_widget_set_vexpand(app->drawing_area, TRUE);
 
@@ -237,8 +358,10 @@ void build_ui(AppState *app)
         | GDK_POINTER_MOTION_MASK
         | GDK_SCROLL_MASK
         | GDK_BUTTON_MOTION_MASK);
-
     g_signal_connect(app->drawing_area, "draw", G_CALLBACK(on_draw_event), app);
+    g_signal_connect(app->drawing_area, "button-press-event", G_CALLBACK(on_button_press), app);
+    g_signal_connect(app->drawing_area, "button-release-event", G_CALLBACK(on_button_release), app);
+    g_signal_connect(app->drawing_area, "motion-notify-event", G_CALLBACK(on_motion_notify), app);
     g_signal_connect(app->drawing_area, "scroll-event", G_CALLBACK(on_scroll), app);
 
     GtkWidget *frame = gtk_frame_new(NULL);
