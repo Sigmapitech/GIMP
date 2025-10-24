@@ -305,6 +305,18 @@ void on_new_blank_layer(GtkButton *btn, gpointer user_data)
     gtk_widget_queue_draw(app->drawing_area);
 }
 
+static gboolean is_dark = TRUE;
+
+static void on_toggle_theme(GtkButton *button, gpointer user_data)
+{
+    is_dark = !is_dark;
+
+    GtkSettings *settings = gtk_settings_get_default();
+    g_object_set(settings, "gtk-application-prefer-dark-theme", is_dark, NULL);
+
+    gtk_button_set_label(button, is_dark ? "Switch to Light" : "Switch to Dark");
+}
+
 static void build_ui(AppState *app)
 {
     app->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -367,6 +379,10 @@ static void build_ui(AppState *app)
     GtkWidget *frame = gtk_frame_new(NULL);
     gtk_container_add(GTK_CONTAINER(frame), app->drawing_area);
     gtk_box_pack_start(GTK_BOX(right_vbox), frame, TRUE, TRUE, 2);
+
+    GtkWidget *theme_btn = gtk_button_new_with_label("Switch to Light");
+    g_signal_connect(theme_btn, "clicked", G_CALLBACK(on_toggle_theme), app);
+    gtk_box_pack_start(GTK_BOX(left_vbox), theme_btn, FALSE, FALSE, 2);
 }
 
 int main(int argc, char *argv[])
@@ -381,6 +397,9 @@ int main(int argc, char *argv[])
     app->current_tool = TOOL_BRUSH;
     app->brush_radius = 10.0;
     gdk_rgba_parse(&app->brush_color, "#000000");
+
+    GtkSettings *settings = gtk_settings_get_default();
+    g_object_set(settings, "gtk-application-prefer-dark-theme", is_dark, NULL);
 
     build_ui(app);
 
