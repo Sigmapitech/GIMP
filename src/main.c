@@ -68,6 +68,13 @@ void on_eraser_button(GtkButton *btn, gpointer user_data)
     app->current_tool = &TOOL_ERASER;
 }
 
+static
+void on_bucket_button(GtkButton *btn, gpointer user_data)
+{
+    AppState *app = user_data;
+    app->current_tool = &TOOL_BUCKET;
+}
+
 static void on_brush_radius_changed(GtkRange *range, gpointer user_data)
 {
     AppState *app = user_data;
@@ -271,13 +278,18 @@ void build_ui(AppState *app)
     GtkWidget *left_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
     gtk_paned_pack1(GTK_PANED(hpaned), left_vbox, FALSE, FALSE);
 
-    GtkWidget *brush_btn = gtk_button_new_with_label("Brush Tool");
+    GtkWidget *brush_btn = gtk_button_new_with_label("Brush");
     g_signal_connect(brush_btn, "clicked", G_CALLBACK(on_brush_button), app);
     gtk_box_pack_start(GTK_BOX(left_vbox), brush_btn, FALSE, FALSE, 2);
 
-    GtkWidget *eraser_btn = gtk_button_new_with_label("Erarser Tool");
+    GtkWidget *eraser_btn = gtk_button_new_with_label("Erarser");
     g_signal_connect(eraser_btn, "clicked", G_CALLBACK(on_eraser_button), app);
     gtk_box_pack_start(GTK_BOX(left_vbox), eraser_btn, FALSE, FALSE, 2);
+
+    GtkWidget *bucket_btn = gtk_button_new_with_label("Bucket");
+    g_signal_connect(bucket_btn, "clicked", G_CALLBACK(on_bucket_button), app);
+    gtk_box_pack_start(GTK_BOX(left_vbox), bucket_btn, FALSE, FALSE, 2);
+
 
     GtkWidget *radius_label = gtk_label_new("Brush Radius");
     gtk_box_pack_start(GTK_BOX(left_vbox), radius_label, FALSE, FALSE, 2);

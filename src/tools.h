@@ -15,5 +15,6 @@ typedef struct Tool {
 
 extern Tool TOOL_BRUSH;
 extern Tool TOOL_ERASER;
+extern Tool TOOL_BUCKET;
 
 #endif
