@@ -58,7 +58,7 @@ static
 void on_brush_button(GtkButton *btn, gpointer user_data)
 {
     AppState *app = user_data;
-    app->current_tool = TOOL_BRUSH;
+    app->current_tool = &TOOL_BRUSH;
 }
 
 static void on_brush_radius_changed(GtkRange *range, gpointer user_data)
@@ -130,63 +130,6 @@ void brush_line(AppState *app, double x0, double y0, double x1, double y1)
         double y = y0 + (y1-y0)*t;
         paint_on_active_layer(app, x, y);
     }
-}
-
-static
-gboolean on_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
-{
-    AppState *app = user_data;
-    gtk_widget_grab_focus(widget);
-
-    if (event->button == GDK_BUTTON_PRIMARY && app->current_tool == TOOL_BRUSH) {
-        app->is_drawing = TRUE;
-        double cx, cy;
-        widget_to_canvas(app, event->x, event->y, &cx, &cy);
-        brush_line(app, cx, cy, cx, cy);
-        gtk_widget_queue_draw(app->drawing_area);
-        app->last_mouse_x = event->x;
-        app->last_mouse_y = event->y;
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-static
-gboolean on_button_release(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
-{
-    AppState *app = user_data;
-
-    if (event->button == GDK_BUTTON_PRIMARY && app->current_tool == TOOL_BRUSH) {
-        app->is_drawing = FALSE;
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-static
-gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpointer user_data)
-{
-    AppState *app = user_data;
-    double x = event->x;
-    double y = event->y;
-
-    if (app->is_drawing && app->current_tool == TOOL_BRUSH) {
-        double cx0, cy0, cx1, cy1;
-        widget_to_canvas(app, app->last_mouse_x, app->last_mouse_y, &cx0, &cy0);
-        widget_to_canvas(app, x, y, &cx1, &cy1);
-        brush_line(app, cx0, cy0, cx1, cy1);
-        app->last_mouse_x = x;
-        app->last_mouse_y = y;
-        gtk_widget_queue_draw(app->drawing_area);
-        return TRUE;
-    }
-
-    app->last_mouse_x = x;
-    app->last_mouse_y = y;
-    gtk_widget_queue_draw(app->drawing_area);
-    return FALSE;
 }
 
 static
@@ -283,6 +226,50 @@ void on_new_blank_layer(GtkButton *btn, gpointer user_data)
     gtk_widget_queue_draw(app->drawing_area);
 }
 
+static
+gboolean on_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+{
+    AppState *app = user_data;
+    double cx, cy;
+    widget_to_canvas(app, event->x, event->y, &cx, &cy);
+
+    if (event->button == GDK_BUTTON_PRIMARY && app->current_tool && app->current_tool->on_button_press)
+        app->current_tool->on_button_press(app, cx, cy);
+
+    app->last_mouse_x = event->x;
+    app->last_mouse_y = event->y;
+    gtk_widget_queue_draw(app->drawing_area);
+    return TRUE;
+}
+
+static
+gboolean on_motion_notify(GtkWidget *widget, GdkEventMotion *event, gpointer user_data)
+{
+    AppState *app = user_data;
+    double cx, cy;
+    widget_to_canvas(app, event->x, event->y, &cx, &cy);
+
+    if (app->current_tool && app->current_tool->on_motion)
+        app->current_tool->on_motion(app, cx, cy);
+
+    gtk_widget_queue_draw(app->drawing_area);
+    return TRUE;
+}
+
+static
+gboolean on_button_release(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+{
+    AppState *app = user_data;
+    double cx, cy;
+    widget_to_canvas(app, event->x, event->y, &cx, &cy);
+
+    if (event->button == GDK_BUTTON_PRIMARY && app->current_tool && app->current_tool->on_button_release)
+        app->current_tool->on_button_release(app, cx, cy);
+
+    gtk_widget_queue_draw(app->drawing_area);
+    return TRUE;
+}
+
 static gboolean is_dark = TRUE;
 
 static void on_toggle_theme(GtkButton *button, gpointer user_data)
@@ -295,7 +282,7 @@ static void on_toggle_theme(GtkButton *button, gpointer user_data)
     gtk_button_set_label(button, is_dark ? "Switch to Light" : "Switch to Dark");
 }
 
-static void build_ui(AppState *app)
+void build_ui(AppState *app)
 {
     app->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(app->window), "GIMP - Layers Demo");
@@ -372,7 +359,7 @@ int main(int argc, char *argv[])
     app->pan_x = 0.0;
     app->pan_y = 0.0;
     app->zoom = 1.0;
-    app->current_tool = TOOL_BRUSH;
+    app->current_tool = &TOOL_BRUSH;
     app->brush_radius = 10.0;
     gdk_rgba_parse(&app->brush_color, "#000000");
 

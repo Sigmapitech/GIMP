@@ -14,7 +14,7 @@ CFLAGS += -O2
 CFLAGS += -iquote src
 CFLAGS += $(shell pkg-config --cflags $(LIBS))
 
-LDLIBS += $(shell pkg-config --libs $(LIBS))
+LDLIBS += -lm $(shell pkg-config --libs $(LIBS))
 
 .PHONY: all
 all: $(OUT)

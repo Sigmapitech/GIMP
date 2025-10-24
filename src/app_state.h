@@ -5,17 +5,16 @@
     #include <stdbool.h>
 
     #include "layer.h"
+    #include "tools.h"
 
-typedef enum { TOOL_PAN, TOOL_BRUSH } ToolType;
-
-typedef struct {
+typedef struct AppState {
     GtkWidget *window;
     GtkWidget *drawing_area;
     GtkWidget *layer_list_box;
     GList *layers;
     Layer *active_layer;
 
-    ToolType current_tool;
+    Tool *current_tool;
     double brush_radius;
     GdkRGBA brush_color;
 
