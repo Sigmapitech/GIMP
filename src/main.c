@@ -339,6 +339,13 @@ void on_move_layer_down(GtkButton *btn, gpointer user_data)
     gtk_widget_queue_draw(app->drawing_area);
 }
 
+static
+void on_brush_color_changed(GtkColorButton *button, gpointer user_data)
+{
+    AppState *app = user_data;
+    gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(button), &app->brush_color);
+}
+
 void build_ui(AppState *app)
 {
     app->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -370,6 +377,13 @@ void build_ui(AppState *app)
     gtk_range_set_value(GTK_RANGE(radius_slider), app->brush_radius);
     g_signal_connect(radius_slider, "value-changed", G_CALLBACK(on_brush_radius_changed), app);
     gtk_box_pack_start(GTK_BOX(tools_vbox), radius_slider, FALSE, FALSE, 2);
+
+    GtkWidget *color_label = gtk_label_new("Brush Color");
+    gtk_box_pack_start(GTK_BOX(tools_vbox), color_label, FALSE, FALSE, 2);
+
+    GtkWidget *color_btn = gtk_color_button_new_with_rgba(&app->brush_color);
+    g_signal_connect(color_btn, "color-set", G_CALLBACK(on_brush_color_changed), app);
+    gtk_box_pack_start(GTK_BOX(tools_vbox), color_btn, FALSE, FALSE, 2);
 
     GtkWidget *theme_btn = gtk_button_new_with_label("Switch Theme");
     g_signal_connect(theme_btn, "clicked", G_CALLBACK(on_toggle_theme), app);
