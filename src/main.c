@@ -291,56 +291,62 @@ static void on_toggle_theme(GtkButton *button, gpointer user_data)
     gtk_button_set_label(button, is_dark ? "Switch to Light" : "Switch to Dark");
 }
 
-void build_ui(AppState *app)
+static GtkWidget *build_tools_panel(AppState *app)
 {
-    app->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(app->window), "GIMP - Layers Demo");
-    gtk_window_set_default_size(GTK_WINDOW(app->window), 1200, 800);
-    g_signal_connect(app->window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
-
-    GtkWidget *hpaned = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
-    gtk_container_add(GTK_CONTAINER(app->window), hpaned);
-
-    GtkWidget *left_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
-    gtk_paned_pack1(GTK_PANED(hpaned), left_vbox, FALSE, FALSE);
+    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
 
     GtkWidget *brush_btn = gtk_button_new_with_label("Brush");
     g_signal_connect(brush_btn, "clicked", G_CALLBACK(on_brush_button), app);
-    gtk_box_pack_start(GTK_BOX(left_vbox), brush_btn, FALSE, FALSE, 2);
+    gtk_box_pack_start(GTK_BOX(vbox), brush_btn, FALSE, FALSE, 2);
 
-    GtkWidget *eraser_btn = gtk_button_new_with_label("Erarser");
+    GtkWidget *eraser_btn = gtk_button_new_with_label("Eraser");
     g_signal_connect(eraser_btn, "clicked", G_CALLBACK(on_eraser_button), app);
-    gtk_box_pack_start(GTK_BOX(left_vbox), eraser_btn, FALSE, FALSE, 2);
+    gtk_box_pack_start(GTK_BOX(vbox), eraser_btn, FALSE, FALSE, 2);
 
     GtkWidget *bucket_btn = gtk_button_new_with_label("Bucket");
     g_signal_connect(bucket_btn, "clicked", G_CALLBACK(on_bucket_button), app);
-    gtk_box_pack_start(GTK_BOX(left_vbox), bucket_btn, FALSE, FALSE, 2);
-
+    gtk_box_pack_start(GTK_BOX(vbox), bucket_btn, FALSE, FALSE, 2);
 
     GtkWidget *radius_label = gtk_label_new("Brush Radius");
-    gtk_box_pack_start(GTK_BOX(left_vbox), radius_label, FALSE, FALSE, 2);
+    gtk_box_pack_start(GTK_BOX(vbox), radius_label, FALSE, FALSE, 2);
+
     GtkWidget *radius_slider = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 1, 50, 1);
     gtk_range_set_value(GTK_RANGE(radius_slider), app->brush_radius);
     g_signal_connect(radius_slider, "value-changed", G_CALLBACK(on_brush_radius_changed), app);
-    gtk_box_pack_start(GTK_BOX(left_vbox), radius_slider, FALSE, FALSE, 2);
+    gtk_box_pack_start(GTK_BOX(vbox), radius_slider, FALSE, FALSE, 2);
 
     GtkWidget *add_btn = gtk_button_new_with_label("Add Image Layer");
     g_signal_connect(add_btn, "clicked", G_CALLBACK(on_add_layer), app);
-    gtk_box_pack_start(GTK_BOX(left_vbox), add_btn, FALSE, FALSE, 2);
+    gtk_box_pack_start(GTK_BOX(vbox), add_btn, FALSE, FALSE, 2);
 
     GtkWidget *new_btn = gtk_button_new_with_label("New Blank Layer");
     g_signal_connect(new_btn, "clicked", G_CALLBACK(on_new_blank_layer), app);
-    gtk_box_pack_start(GTK_BOX(left_vbox), new_btn, FALSE, FALSE, 2);
+    gtk_box_pack_start(GTK_BOX(vbox), new_btn, FALSE, FALSE, 2);
+
+    GtkWidget *theme_btn = gtk_button_new_with_label("Switch to Light");
+    g_signal_connect(theme_btn, "clicked", G_CALLBACK(on_toggle_theme), app);
+    gtk_box_pack_start(GTK_BOX(vbox), theme_btn, FALSE, FALSE, 2);
+
+    return vbox;
+}
+
+static
+GtkWidget *build_layers_panel(AppState *app)
+{
+    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
 
     GtkWidget *layer_label = gtk_label_new("Layers");
-    gtk_box_pack_start(GTK_BOX(left_vbox), layer_label, FALSE, FALSE, 2);
+    gtk_box_pack_start(GTK_BOX(vbox), layer_label, FALSE, FALSE, 2);
 
     app->layer_list_box = gtk_list_box_new();
-    gtk_box_pack_start(GTK_BOX(left_vbox), app->layer_list_box, TRUE, TRUE, 2);
+    gtk_box_pack_start(GTK_BOX(vbox), app->layer_list_box, TRUE, TRUE, 2);
 
-    GtkWidget *right_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
-    gtk_paned_pack2(GTK_PANED(hpaned), right_vbox, TRUE, FALSE);
+    return vbox;
+}
 
+static
+GtkWidget *build_drawing_area(AppState *app)
+{
     app->drawing_area = gtk_drawing_area_new();
     app->is_drawing = false;
 
@@ -361,11 +367,31 @@ void build_ui(AppState *app)
 
     GtkWidget *frame = gtk_frame_new(NULL);
     gtk_container_add(GTK_CONTAINER(frame), app->drawing_area);
-    gtk_box_pack_start(GTK_BOX(right_vbox), frame, TRUE, TRUE, 2);
+    return frame;
+}
 
-    GtkWidget *theme_btn = gtk_button_new_with_label("Switch to Light");
-    g_signal_connect(theme_btn, "clicked", G_CALLBACK(on_toggle_theme), app);
-    gtk_box_pack_start(GTK_BOX(left_vbox), theme_btn, FALSE, FALSE, 2);
+static
+void build_ui(AppState *app)
+{
+    app->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_title(GTK_WINDOW(app->window), "GIMP - Layers Demo");
+    gtk_window_set_default_size(GTK_WINDOW(app->window), 1200, 800);
+    g_signal_connect(app->window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
+
+    GtkWidget *hpaned = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
+    gtk_container_add(GTK_CONTAINER(app->window), hpaned);
+
+    GtkWidget *tools_panel = build_tools_panel(app);
+    gtk_paned_pack1(GTK_PANED(hpaned), tools_panel, FALSE, FALSE);
+
+    GtkWidget *right_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+    gtk_paned_pack2(GTK_PANED(hpaned), right_vbox, TRUE, FALSE);
+
+    GtkWidget *drawing_frame = build_drawing_area(app);
+    gtk_box_pack_start(GTK_BOX(right_vbox), drawing_frame, TRUE, TRUE, 2);
+
+    GtkWidget *layers_panel = build_layers_panel(app);
+    gtk_box_pack_start(GTK_BOX(right_vbox), layers_panel, FALSE, FALSE, 2);
 }
 
 int main(int argc, char *argv[])
