@@ -331,6 +331,18 @@ static GtkWidget *build_tools_panel(AppState *app)
 }
 
 static
+void on_layer_row_selected(GtkListBox *box, GtkListBoxRow *row, gpointer user_data) {
+    AppState *app = user_data;
+    if (!row) return;
+
+    Layer *l = g_object_get_data(G_OBJECT(row), "layer_ptr");
+    if (l) {
+        app->active_layer = l;
+        gtk_widget_queue_draw(app->drawing_area);
+    }
+}
+
+static
 GtkWidget *build_layers_panel(AppState *app)
 {
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
@@ -341,8 +353,12 @@ GtkWidget *build_layers_panel(AppState *app)
     app->layer_list_box = gtk_list_box_new();
     gtk_box_pack_start(GTK_BOX(vbox), app->layer_list_box, TRUE, TRUE, 2);
 
+    g_signal_connect(app->layer_list_box, "row-selected",
+        G_CALLBACK(on_layer_row_selected), app);
+
     return vbox;
 }
+
 
 static
 GtkWidget *build_drawing_area(AppState *app)
