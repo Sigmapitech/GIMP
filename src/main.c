@@ -7,8 +7,31 @@
 #include "app_state.h"
 #include "layer.h"
 
-#define DEFAULT_CANVAS_W 255
-#define DEFAULT_CANVAS_H 255
+#define DEFAULT_CANVAS_W 512
+#define DEFAULT_CANVAS_H 512
+
+static
+void layer_fill_checkerboard(Layer *base, int cell_size)
+{
+    if (!base || !base->surface) return;
+
+    int w = cairo_image_surface_get_width(base->surface);
+    int h = cairo_image_surface_get_height(base->surface);
+    cairo_t *cr = cairo_create(base->surface);
+
+    for (int y = 0; y < h; y += cell_size) {
+        for (int x = 0; x < w; x += cell_size) {
+            if (((x / cell_size) + (y / cell_size)) % 2 == 0)
+                cairo_set_source_rgb(cr, 0.8, 0.8, 0.8); // light gray
+            else
+                cairo_set_source_rgb(cr, 0.6, 0.6, 0.6); // dark gray
+            cairo_rectangle(cr, x, y, cell_size, cell_size);
+            cairo_fill(cr);
+        }
+    }
+
+    cairo_destroy(cr);
+}
 
 static
 gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data)
@@ -23,13 +46,16 @@ gboolean on_draw_event(GtkWidget *widget, cairo_t *cr, gpointer user_data)
     cairo_surface_t *tmp_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, vw, vh);
     cairo_t *tmp_cr = cairo_create(tmp_surface);
 
-    cairo_set_source_rgb(tmp_cr, 1, 1, 1);
+    GdkRGBA bg;
+    GtkStyleContext *ctx = gtk_widget_get_style_context(widget);
+    gtk_render_background(ctx, cr, 0, 0, alloc.width, alloc.height);
+    cairo_set_source_rgba(tmp_cr, bg.red, bg.green, bg.blue, bg.alpha);
+
+    cairo_scale(tmp_cr, app->zoom, app->zoom);
     cairo_paint(tmp_cr);
 
     int canvas_x0 = (int)floor(app->pan_x);
     int canvas_y0 = (int)floor(app->pan_y);
-
-    cairo_scale(tmp_cr, app->zoom, app->zoom);
 
     for (GList *it = app->layers; it != NULL; it = it->next) {
         Layer *l = it->data;
@@ -361,6 +387,7 @@ int main(int argc, char *argv[])
     build_ui(app);
 
     Layer *base = layer_new_blank("Base", DEFAULT_CANVAS_W, DEFAULT_CANVAS_H);
+    layer_fill_checkerboard(base, 10);
     app->layers = g_list_append(app->layers, base);
     app->active_layer = base;
     refresh_layer_list(app);
