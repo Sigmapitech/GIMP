@@ -61,6 +61,13 @@ void on_brush_button(GtkButton *btn, gpointer user_data)
     app->current_tool = &TOOL_BRUSH;
 }
 
+static
+void on_eraser_button(GtkButton *btn, gpointer user_data)
+{
+    AppState *app = user_data;
+    app->current_tool = &TOOL_ERASER;
+}
+
 static void on_brush_radius_changed(GtkRange *range, gpointer user_data)
 {
     AppState *app = user_data;
@@ -95,41 +102,10 @@ gboolean on_scroll(GtkWidget *widget, GdkEventScroll *event, gpointer user_data)
 }
 
 static
-void paint_on_active_layer(AppState *app, double cx, double cy)
-{
-    if (!app->active_layer || !app->active_layer->surface) return;
-    cairo_t *cr = cairo_create(app->active_layer->surface);
-    cairo_set_source_rgba(cr,
-        app->brush_color.red,
-        app->brush_color.green,
-        app->brush_color.blue,
-        app->brush_color.alpha);
-    cairo_arc(cr, cx, cy, app->brush_radius, 0, 2*M_PI);
-    cairo_fill(cr);
-    cairo_destroy(cr);
-}
-
-static
 void widget_to_canvas(AppState *app, double wx, double wy, double *cx, double *cy)
 {
     *cx = wx / app->zoom + app->pan_x;
     *cy = wy / app->zoom + app->pan_y;
-}
-
-static
-void brush_line(AppState *app, double x0, double y0, double x1, double y1)
-{
-    double dx = x1 - x0;
-    double dy = y1 - y0;
-    double dist = sqrt(dx*dx + dy*dy);
-    int steps = MAX(1, (int)(dist / (app->brush_radius * 0.5)));
-
-    for (int i=0;i<=steps;i++) {
-        double t = (double)i/steps;
-        double x = x0 + (x1-x0)*t;
-        double y = y0 + (y1-y0)*t;
-        paint_on_active_layer(app, x, y);
-    }
 }
 
 static
@@ -298,6 +274,10 @@ void build_ui(AppState *app)
     GtkWidget *brush_btn = gtk_button_new_with_label("Brush Tool");
     g_signal_connect(brush_btn, "clicked", G_CALLBACK(on_brush_button), app);
     gtk_box_pack_start(GTK_BOX(left_vbox), brush_btn, FALSE, FALSE, 2);
+
+    GtkWidget *eraser_btn = gtk_button_new_with_label("Erarser Tool");
+    g_signal_connect(eraser_btn, "clicked", G_CALLBACK(on_eraser_button), app);
+    gtk_box_pack_start(GTK_BOX(left_vbox), eraser_btn, FALSE, FALSE, 2);
 
     GtkWidget *radius_label = gtk_label_new("Brush Radius");
     gtk_box_pack_start(GTK_BOX(left_vbox), radius_label, FALSE, FALSE, 2);
