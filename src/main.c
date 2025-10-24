@@ -303,6 +303,42 @@ void on_layer_row_selected(GtkListBox *box, GtkListBoxRow *row, gpointer user_da
     }
 }
 
+void on_move_layer_up(GtkButton *btn, gpointer user_data)
+{
+    AppState *app = user_data;
+    if (!app->active_layer || !app->layers)
+        return;
+
+    GList *node = g_list_find(app->layers, app->active_layer);
+    if (!node || !node->next)
+        return;
+
+    gpointer next_data = node->next->data;
+    node->next->data = node->data;
+    node->data = next_data;
+
+    refresh_layer_list(app);
+    gtk_widget_queue_draw(app->drawing_area);
+}
+
+void on_move_layer_down(GtkButton *btn, gpointer user_data)
+{
+    AppState *app = user_data;
+    if (!app->active_layer || !app->layers)
+        return;
+
+    GList *node = g_list_find(app->layers, app->active_layer);
+    if (!node || !node->prev)
+        return;
+
+    gpointer prev_data = node->prev->data;
+    node->prev->data = node->data;
+    node->data = prev_data;
+
+    refresh_layer_list(app);
+    gtk_widget_queue_draw(app->drawing_area);
+}
+
 void build_ui(AppState *app)
 {
     app->window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -372,6 +408,14 @@ void build_ui(AppState *app)
     g_signal_connect(new_btn, "clicked", G_CALLBACK(on_new_blank_layer), app);
     gtk_box_pack_start(GTK_BOX(layers_vbox), new_btn, FALSE, FALSE, 2);
 
+    GtkWidget *move_up_btn = gtk_button_new_with_label("Move Up");
+    g_signal_connect(move_up_btn, "clicked", G_CALLBACK(on_move_layer_up), app);
+    gtk_box_pack_start(GTK_BOX(layers_vbox), move_up_btn, FALSE, FALSE, 2);
+
+    GtkWidget *move_down_btn = gtk_button_new_with_label("Move Down");
+    g_signal_connect(move_down_btn, "clicked", G_CALLBACK(on_move_layer_down), app);
+    gtk_box_pack_start(GTK_BOX(layers_vbox), move_down_btn, FALSE, FALSE, 2);
+
     GtkWidget *layer_label = gtk_label_new("Layers");
     gtk_box_pack_start(GTK_BOX(layers_vbox), layer_label, FALSE, FALSE, 2);
 
@@ -381,6 +425,7 @@ void build_ui(AppState *app)
                      G_CALLBACK(on_layer_row_selected), app);
     gtk_box_pack_start(GTK_BOX(layers_vbox), app->layer_list_box, TRUE, TRUE, 2);
 }
+
 
 int main(int argc, char *argv[])
 {
